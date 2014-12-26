@@ -1,0 +1,9 @@
+{application, bcrypt,
+ [
+  {description, "Bcrypt Erlang/C library"},
+  {vsn, "0.1.0"},
+  {modules, [bcrypt]},
+  {registered, []},
+  {applications, [kernel,stdlib,crypto]},
+  {env, []}
+ ]}.
