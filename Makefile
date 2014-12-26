@@ -1,4 +1,4 @@
-all: compile
+all: clean compile tests
 
 compile:
 	@rebar compile
