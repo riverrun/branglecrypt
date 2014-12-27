@@ -5,6 +5,8 @@
 -export([gen_salt/0, gen_salt/1, hashpw/2, checkpw/2, hashpwsalt/1, dummy_checkpw/0]).
 -on_load(init/0).
 
+-define(LOGR, 12).
+
 start() -> application:start(bcrypt).
 stop() -> application:stop(bcrypt).
 
@@ -28,13 +30,13 @@ init() ->
 %%      is 31.
 %%      The minimum and maximum values are checked by the C code.
 gen_salt() ->
-    gen_salt(12).
+    gen_salt(?LOGR).
 
 gen_salt(LogRounds) when is_integer(LogRounds) ->
     R = crypto:rand_bytes(16),
     encode_salt(R, LogRounds);
 gen_salt(_LogR) ->
-    gen_salt(12).
+    gen_salt(?LOGR).
 
 encode_salt(_R, _LogRounds) ->
     erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
@@ -48,7 +50,7 @@ hashpw(_Password, _Salt) ->
 %% @doc Convenience function that randomly generates a salt,
 %%      and then hashes the password with that salt.
 hashpwsalt(Password) ->
-    Salt = gen_salt(12),
+    Salt = gen_salt(?LOGR),
     hashpw(Password, Salt).
 
 %% @spec checkpw(Password::binary(), Hash::binary()) -> boolean()
