@@ -62,3 +62,12 @@ long_pass_test_() ->
 pairs(Pairs) ->
     [?_assert(Hash =:= bcrypt:hashpw(Pass, Salt)) ||
      {Pass, Salt, Hash} <- Pairs].
+
+hash_check_test_() ->
+    H = bcrypt:hashpwsalt("hardtoguess"),
+    [?_assert(bcrypt:checkpw("hardtoguess", H) =:= true),
+    ?_assert(bcrypt:checkpw("hatdoguess", H) =:= false),
+    ?_assert(bcrypt:checkpw("ohsodifficult", H) =:= false)].
+
+dummy_check_test_() ->
+    ?_assert(bcrypt:dummy_checkpw() =:= false).

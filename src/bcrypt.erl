@@ -2,7 +2,7 @@
 
 -module(bcrypt).
 -export([start/0, stop/0]).
--export([gen_salt/0, gen_salt/1, hashpw/2, checkpw/2]).
+-export([gen_salt/0, gen_salt/1, hashpw/2, checkpw/2, hashpwsalt/1, dummy_checkpw/0]).
 -on_load(init/0).
 
 start() -> application:start(bcrypt).
@@ -12,13 +12,13 @@ stop() -> application:stop(bcrypt).
 %% @doc Initialize bcrypt NIF (the functions encode_salt and hashpw).
 init() ->
     SoName = filename:join(case code:priv_dir(?MODULE) of
-                 {error, bad_name} ->
-                     filename:join(
-                       [filename:dirname(
-                          code:which(?MODULE)),"..","priv"]);
-                 Dir ->
-                     Dir
-             end, atom_to_list(?MODULE) ++ "_nif"),
+                               {error, bad_name} ->
+                                   filename:join(
+                                     [filename:dirname(
+                                        code:which(?MODULE)),"..","priv"]);
+                               Dir ->
+                                   Dir
+                           end, atom_to_list(?MODULE) ++ "_nif"),
     erlang:load_nif(SoName, 0).
 
 %% @spec gen_salt(integer()) -> string()
@@ -37,17 +37,49 @@ gen_salt(_LogR) ->
     gen_salt(12).
 
 encode_salt(_R, _LogRounds) ->
-    nif_stub_error(?LINE).
+    erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
 
 %% @spec hashpw(Password::binary(), Salt::binary()) -> string()
 %% @doc Hash the password using the OpenBSD Bcrypt scheme.
 hashpw(_Password, _Salt) ->
-    nif_stub_error(?LINE).
+    erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
 
-nif_stub_error(Line) ->
-    erlang:nif_error({nif_not_loaded, module, ?MODULE, line, Line}).
+%% @spec hashpwsalt(Password::binary()) -> string()
+%% @doc Convenience function that randomly generates a salt,
+%%      and then hashes the password with that salt.
+hashpwsalt(Password) ->
+    Salt = gen_salt(12),
+    hashpw(Password, Salt).
 
-%% @spec checkpw(Password::binary(), Hash::binary()) -> string()
-%% @doc Check the password.
-checkpw(Plaintext, Hash) ->
-    {ok, Hash} =:= hashpw(Plaintext, Hash).
+%% @spec checkpw(Password::binary(), Hash::binary()) -> boolean()
+%% @doc Check the password against the stored hash.
+%%      The password and stored hash are compared in constant time
+%%      to avoid timing attacks.
+checkpw(Plaintext, Stored_hash) ->
+    Hash = hashpw(Plaintext, Stored_hash),
+    secure_check(Hash, Stored_hash).
+
+%% @spec dummy_checkpw() -> boolean()
+%% @doc Perform a dummy check for a user that does not exist.
+%%      This always returns false.
+%%      The reason for implementing this check is in order to make
+%%      user enumeration via timing attacks more difficult.
+dummy_checkpw() ->
+    checkpw("", "$2a$05$CCCCCCCCCCCCCCCCCCCCC.7uG0VCzI2bS7j6ymqJi9CdcdxiRTWNy"),
+    false.
+
+%% @spec secure_check(Hash::binary() | string(), Stored::binary() | string()) -> boolean()
+secure_check(<<Hash/binary>>, <<Stored/binary>>) ->
+    secure_check(binary_to_list(Hash), binary_to_list(Stored));
+secure_check(Hash, Stored) when is_list(Hash) and is_list(Stored) ->
+    case length(Hash) == length(Stored) of
+        true -> secure_check(Hash, Stored, 0);
+        false -> false
+    end;
+secure_check(_Hash, _Stored) -> false.
+
+%% @spec secure_check(H::string(), S::string(), Result::integer()) -> boolean()
+secure_check([H|RestH], [S|RestS], Result) ->
+    secure_check(RestH, RestS, (H bxor S) bor Result);
+secure_check([], [], Result) ->
+    Result == 0.
