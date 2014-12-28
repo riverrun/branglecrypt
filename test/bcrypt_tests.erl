@@ -23,3 +23,12 @@ hash_check_test_() ->
 
 dummy_check_test_() ->
     ?_assert(bcrypt:dummy_checkpw() =:= false).
+
+salt_log_num_test_() ->
+    [?_assert(lists:prefix("$2b$08$", bcrypt:gen_salt(8)) =:= true),
+    ?_assert(lists:prefix("$2b$20$", bcrypt:gen_salt(20)) =:= true)].
+
+salt_wrong_test_() ->
+    [?_assert(lists:prefix("$2b$04$", bcrypt:gen_salt(3)) =:= true),
+    ?_assert(lists:prefix("$2b$31$", bcrypt:gen_salt(32)) =:= true),
+    ?_assert(lists:prefix("$2b$12$", bcrypt:gen_salt(["wrong type"])) =:= true)].
