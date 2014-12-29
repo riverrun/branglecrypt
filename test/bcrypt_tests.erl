@@ -28,7 +28,11 @@ salt_log_num_test_() ->
     [?_assert(lists:prefix("$2b$08$", bcrypt:gen_salt(8)) =:= true),
     ?_assert(lists:prefix("$2b$20$", bcrypt:gen_salt(20)) =:= true)].
 
-salt_wrong_test_() ->
+salt_wrong_input_test_() ->
     [?_assert(lists:prefix("$2b$04$", bcrypt:gen_salt(3)) =:= true),
     ?_assert(lists:prefix("$2b$31$", bcrypt:gen_salt(32)) =:= true),
     ?_assert(lists:prefix("$2b$12$", bcrypt:gen_salt(["wrong type"])) =:= true)].
+
+hash_wrong_input_test_() ->
+    [?_assertError(badarg, bcrypt:hashpw("U*U", "$2a$05$CCCCCCCCCCCCCCCCCCC.")),
+    ?_assertError(badarg, bcrypt:hashpw(["U*U"], "$2a$05$CCCCCCCCCCCCCCCCCCCCC."))].
