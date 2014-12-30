@@ -28,6 +28,12 @@ salt_log_num_test_() ->
     [?_assert(lists:prefix("$2b$08$", bcrypt:gen_salt(8)) =:= true),
     ?_assert(lists:prefix("$2b$20$", bcrypt:gen_salt(20)) =:= true)].
 
+salt_length_test_() ->
+    [?_assert(length(bcrypt:gen_salt()) == 29),
+    ?_assert(length(bcrypt:gen_salt(8)) == 29),
+    ?_assert(length(bcrypt:gen_salt(20)) == 29),
+    ?_assert(length(bcrypt:gen_salt("wrong input but still works")) == 29)].
+
 salt_wrong_input_test_() ->
     [?_assert(lists:prefix("$2b$04$", bcrypt:gen_salt(3)) =:= true),
     ?_assert(lists:prefix("$2b$31$", bcrypt:gen_salt(32)) =:= true),
