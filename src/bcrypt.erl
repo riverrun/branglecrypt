@@ -1,4 +1,11 @@
 %%% @doc Erlang NIF implementation of OpenBSD Bcrypt hashing scheme.
+%%%      Bcrypt is a key derivation function for passwords designed by Niels Provos
+%%%      and David Mazières. Bcrypt uses a salt to protect against offline attacks.
+%%%      It is also an adaptive function, which means that it can be configured
+%%%      to remain slow and resistant to brute-force attacks even as computational
+%%%      power increases.
+%%%      This bcrypt implementation is based on the latest OpenBSD version, which
+%%%      fixed a small issue that affected some passwords longer than 72 characters.
 
 -module(bcrypt).
 -export([start/0, stop/0]).
