@@ -78,4 +78,6 @@ b64e(X) ->
 b64d(X) ->
     b64d_ok(element(X, ?DECODE_MAP)).
 
-b64d_ok(I) when is_integer(I) -> I.
+b64d_ok(I) when is_integer(I) -> I;
+b64d_ok(_) ->
+    erlang:error({badarg}).

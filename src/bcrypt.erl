@@ -60,7 +60,7 @@ bf_encrypt(_State) ->
 gen_salt() ->
     gen_salt(?LOGR).
 
-gen_salt(LogRounds) when is_integer(LogRounds) ->
+gen_salt(LogRounds) when is_integer(LogRounds), LogRounds > 4, LogRounds < 32 ->
     fmt_salt(binary:bin_to_list(random_bytes(16)), zero_str(LogRounds));
 gen_salt(_LogR) ->
     gen_salt(?LOGR).
@@ -105,12 +105,12 @@ expand_keys(State, Key, Key_len, Salt, Rounds) ->
     expand_keys(NewState, Key, Key_len, Salt, Rounds - 1).
 
 zero_str(LogRounds) ->
-    if LogRounds < 10 -> "0";
-       true -> LogRounds
+    if LogRounds < 10 -> [48| integer_to_list(LogRounds)];
+       true -> integer_to_list(LogRounds)
     end.
 
 fmt_salt(Salt, LogRounds) ->
-    lists:concat(["$2b$", integer_to_list(LogRounds), "$", tools:encode64(Salt)]).
+    lists:concat(["$2b$", LogRounds, "$", tools:encode64(Salt)]).
 
 fmt_hash(Hash, Salt, Prefix, LogRounds) ->
     lists:concat(["$", Prefix, "$", LogRounds, "$", Salt, tools:encode64(Hash)]).
