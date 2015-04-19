@@ -14,8 +14,12 @@
 
 -define(LOGR, 12).
 
-start() -> application:start(bcrypt).
-stop() -> application:stop(bcrypt).
+start() ->
+    application:start(tools),
+    application:start(bcrypt).
+stop() ->
+    application:stop(tools),
+    application:stop(bcrypt).
 
 %% @spec init() -> ok
 %% @doc Initialize bcrypt NIF (the functions encode_salt and hashpw).
@@ -30,6 +34,23 @@ init() ->
                            end, atom_to_list(?MODULE) ++ "_nif"),
     erlang:load_nif(SoName, 0).
 
+%% @spec bf_init(Key::string(), Key_len::integer(), Salt::string()) -> string()
+%% @doc Initialize the P-box and S-box tables with the digits of Pi,
+%%      and then start the key expansion process.
+bf_init(_Key, _Key_len, _Salt) ->
+    erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
+
+%% @spec bf_init(State::binary(), Key::string(), Key_len::integer(), Salt::string()) -> binary()
+%% @doc The main key expansion function. This function is called
+%%      2^log_rounds times.
+bf_expand(_State, _Key, _Key_len, _Salt) ->
+    erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
+
+%% @spec bf_init(Key::string(), Key_len::integer(), Salt::string()) -> string()
+%% @doc Encrypt and return the hash.
+bf_encrypt(_State) ->
+    erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
+
 %% @spec gen_salt(integer()) -> string()
 %% @doc Generate a salt for use with the hashpw function.
 %%      The log_rounds parameter determines the computational complexity
@@ -40,27 +61,67 @@ gen_salt() ->
     gen_salt(?LOGR).
 
 gen_salt(LogRounds) when is_integer(LogRounds) ->
-    R = crypto:rand_bytes(16),
-    encode_salt(R, LogRounds);
+    fmt_salt(binary:bin_to_list(random_bytes(16)), zero_str(LogRounds));
 gen_salt(_LogR) ->
     gen_salt(?LOGR).
 
-encode_salt(_R, _LogRounds) ->
-    erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
+random_bytes(N) when is_integer(N) ->
+    try crypto:strong_rand_bytes(N) of
+        RandBytes ->
+            RandBytes
+    catch
+        error:low_entropy ->
+            crypto:rand_bytes(N)
+    end;
+random_bytes(_N) ->
+    erlang:error({badarg}).
 
-%% @spec hashpw(Password::binary(), Salt::binary()) -> string()
-%% @doc Hash the password using the OpenBSD Bcrypt scheme.
-hashpw(_Password, _Salt) ->
-    erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
+%% @spec hashpw(Password::string(), Salt::string()) -> string()
+%% @doc Hash the password using bcrypt.
+hashpw(Password, Salt) ->
+    {Salt1, _} = lists:split(29, Salt),
+    [Prefix, LogRounds, Salt2] = string:tokens(Salt1, "$"),
+    Hash = bcrypt(Password, Salt2, Prefix, LogRounds),
+    fmt_hash(Hash, Salt2, Prefix, LogRounds).
 
-%% @spec hashpwsalt(Password::binary()) -> string()
+bcrypt(Key, Salt, Prefix, LogRounds) ->
+    Key_len = case Prefix of
+        "2b" -> min(73, length(Key) + 1);
+        _ -> length(Key) + 1
+    end,
+    {Salt1, Rounds} = prepare_keys(Salt, string:to_integer(LogRounds)),
+    State = bf_init(Key, Key_len, Salt1),
+    bf_encrypt(expand_keys(State, Key, Key_len, Salt1, Rounds)).
+
+prepare_keys(Salt, {LogRounds, _}) when LogRounds > 4 andalso LogRounds < 32 ->
+    {tools:decode64(Salt), 1 bsl LogRounds};
+prepare_keys(_, _) ->
+    erlang:error({badarg}).
+
+expand_keys(State, _Key, _Key_len, _Salt, 0) ->
+    State;
+expand_keys(State, Key, Key_len, Salt, Rounds) ->
+    NewState = bf_expand(State, Key, Key_len, Salt),
+    expand_keys(NewState, Key, Key_len, Salt, Rounds - 1).
+
+zero_str(LogRounds) ->
+    if LogRounds < 10 -> "0";
+       true -> LogRounds
+    end.
+
+fmt_salt(Salt, LogRounds) ->
+    lists:concat(["$2b$", integer_to_list(LogRounds), "$", tools:encode64(Salt)]).
+
+fmt_hash(Hash, Salt, Prefix, LogRounds) ->
+    lists:concat(["$", Prefix, "$", LogRounds, "$", Salt, tools:encode64(Hash)]).
+
+%% @spec hashpwsalt(Password::string()) -> string()
 %% @doc Convenience function that randomly generates a salt,
 %%      and then hashes the password with that salt.
 hashpwsalt(Password) ->
-    Salt = gen_salt(?LOGR),
-    hashpw(Password, Salt).
+    hashpw(Password, gen_salt(?LOGR)).
 
-%% @spec checkpw(Password::binary(), Hash::binary()) -> boolean()
+%% @spec checkpw(Password::string(), Hash::string()) -> boolean()
 %% @doc Check the password against the stored hash.
 %%      The password and stored hash are compared in constant time
 %%      to avoid timing attacks.
@@ -74,10 +135,10 @@ checkpw(Plaintext, Stored_hash) ->
 %%      The reason for implementing this check is in order to make
 %%      user enumeration via timing attacks more difficult.
 dummy_checkpw() ->
-    checkpw("", "$2a$05$CCCCCCCCCCCCCCCCCCCCC.7uG0VCzI2bS7j6ymqJi9CdcdxiRTWNy"),
+    hashpwsalt("password"),
     false.
 
-%% @spec secure_check(Hash::binary() | string(), Stored::binary() | string()) -> boolean()
+%% @spec secure_check(Hash::string() | string(), Stored::string() | string()) -> boolean()
 secure_check(<<Hash/binary>>, <<Stored/binary>>) ->
     secure_check(binary_to_list(Hash), binary_to_list(Stored));
 secure_check(Hash, Stored) when is_list(Hash) and is_list(Stored) ->

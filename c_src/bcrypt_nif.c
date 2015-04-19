@@ -1,5 +1,8 @@
+/*	$OpenBSD: bcrypt.c,v 1.52 2015/01/28 23:33:52 tedu Exp $	*/
+
 /*
- * Copyright (c) 2011 Hunter Morris <hunter.morris@smarkets.com>
+ * Copyright (c) 2014 Ted Unangst <tedu@openbsd.org>
+ * Copyright (c) 1997 Niels Provos <provos@umich.edu>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,6 +16,22 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+/* This password hashing algorithm was designed by David Mazieres
+ * <dm@lcs.mit.edu> and works as follows:
+ *
+ * 1. state := InitState ()
+ * 2. state := ExpandKey (state, salt, password)
+ * 3. REPEAT rounds:
+ *      state := ExpandKey (state, 0, password)
+ *	state := ExpandKey (state, 0, salt)
+ * 4. ctext := "OrpheanBeholderScryDoubt"
+ * 5. REPEAT 64:
+ * 	ctext := Encrypt_ECB (state, ctext);
+ * 6. RETURN Concatenate (salt, ctext);
+ *
+ * This version is designed to not allow any NIF to run for too long,
+ * and has been implemented by David Whitlock and Jason M Barnes.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,66 +41,136 @@
 #include "erl_nif.h"
 #include "erl_blf.h"
 
-#define BCRYPT_MAXSALT 16	/* Precomputation is just so nice */
-#define BCRYPT_SALTSPACE	(7 + (BCRYPT_MAXSALT * 4 + 2) / 3 + 1)
-#define BCRYPT_HASHSPACE	61
+#define BCRYPT_MAXSALT 16
+#define BCRYPT_WORDS 6
+#define	BCRYPT_HASHLEN 23
 
-int bcrypt(const char *, const char *, char *, size_t);
-void encode_salt(char *, size_t, uint8_t *, uint16_t, int);
+static void secure_bzero(void *, size_t);
 
-static ERL_NIF_TERM erl_encode_salt(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+static ERL_NIF_TERM bf_init(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    ErlNifBinary csalt, bin;
-    unsigned long log_rounds;
+	ErlNifBinary state;
+	char key[1024];
+	char salt[1024];
+	size_t key_len;
+	unsigned long key_len_arg;
+	uint8_t salt_len;
 
-    if (!enif_inspect_binary(env, argv[0], &csalt) || 16 != csalt.size) {
-        return enif_make_badarg(env);
-    }
+	if (argc != 3 || !enif_get_string(env, argv[0], key, sizeof(key), ERL_NIF_LATIN1) ||
+			!enif_get_ulong(env, argv[1], &key_len_arg) ||
+			!enif_get_string(env, argv[2], salt, sizeof(salt), ERL_NIF_LATIN1))
+		return enif_make_badarg(env);
+	key_len = (size_t) key_len_arg;
+	salt_len = BCRYPT_MAXSALT;
 
-    if (!enif_get_ulong(env, argv[1], &log_rounds)) {
-        enif_release_binary(&csalt);
-        return enif_make_badarg(env);
-    }
+	if (!enif_alloc_binary(sizeof(blf_ctx), &state))
+		return enif_make_badarg(env);
 
-    if (!enif_alloc_binary(64, &bin)) {
-        enif_release_binary(&csalt);
-        return enif_make_badarg(env);
-    }
+	Blowfish_initstate((blf_ctx *) state.data);
+	Blowfish_expandstate((blf_ctx *) state.data, (uint8_t *) salt,
+			salt_len, (uint8_t *) key, key_len);
 
-    encode_salt((char *)bin.data, bin.size, (uint8_t*)csalt.data, csalt.size,
-            log_rounds);
-    enif_release_binary(&csalt);
-
-    return enif_make_string(env, (char *)bin.data, ERL_NIF_LATIN1);
+	return enif_make_binary(env, &state);
 }
 
-static ERL_NIF_TERM hashpw(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+static ERL_NIF_TERM bf_expand(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    char pw[1024];
-    char salt[1024];
-    char encrypted[BCRYPT_HASHSPACE];
+	ErlNifBinary state;
+	char key[1024];
+	char salt[1024];
+	size_t key_len;
+	unsigned long key_len_arg;
+	uint8_t salt_len;
 
-    (void)memset(&pw, '\0', sizeof(pw));
-    (void)memset(&salt, '\0', sizeof(salt));
+	if (argc != 4 || !enif_inspect_binary(env, argv[0], &state))
+		return enif_make_badarg(env);
+	if (!enif_get_string(env, argv[1], key, sizeof(key), ERL_NIF_LATIN1) ||
+			!enif_get_ulong(env, argv[2], &key_len_arg) ||
+			!enif_get_string(env, argv[3], salt, sizeof(salt), ERL_NIF_LATIN1))
+		return enif_make_badarg(env);
+	key_len = (size_t) key_len_arg;
+	salt_len = BCRYPT_MAXSALT;
 
-    if (enif_get_string(env, argv[0], pw, sizeof(pw), ERL_NIF_LATIN1) < 1)
-        return enif_make_badarg(env);
+	Blowfish_expand0state((blf_ctx *) state.data, (uint8_t *) key, key_len);
+	Blowfish_expand0state((blf_ctx *) state.data, (uint8_t *) salt, salt_len);
 
-    if (enif_get_string(env, argv[1], salt, sizeof(salt), ERL_NIF_LATIN1) < 1)
-        return enif_make_badarg(env);
+	return enif_make_binary(env, &state);
+}
 
-    if (bcrypt(pw, salt, encrypted, sizeof(encrypted)) ||
-            0 == strcmp(encrypted, ":")) {
-        return enif_make_badarg(env);
-    }
+static ERL_NIF_TERM bf_encrypt(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+	ErlNifBinary state;
+	uint32_t i, k, m;
+	uint16_t j;
+	uint8_t ciphertext[4 * BCRYPT_WORDS] = "OrpheanBeholderScryDoubt";
+	uint32_t cdata[BCRYPT_WORDS];
+	ERL_NIF_TERM encrypted[4 * BCRYPT_WORDS];
 
-    return enif_make_string(env, encrypted, ERL_NIF_LATIN1);
+	/* Initialize our data from argv */
+	if (argc != 1 || !enif_inspect_binary(env, argv[0], &state))
+		return enif_make_badarg(env);
+
+	/* This can be precomputed later */
+	j = 0;
+	for (i = 0; i < BCRYPT_WORDS; i++)
+		cdata[i] = Blowfish_stream2word(ciphertext, 4 * BCRYPT_WORDS, &j);
+
+	/* Now do the encryption */
+	for (k = 0; k < 64; k++)
+		blf_enc((blf_ctx *) state.data, cdata, BCRYPT_WORDS / 2);
+
+	for (i = 0; i < BCRYPT_WORDS; i++) {
+		ciphertext[4 * i + 3] = cdata[i] & 0xff;
+		cdata[i] = cdata[i] >> 8;
+		ciphertext[4 * i + 2] = cdata[i] & 0xff;
+		cdata[i] = cdata[i] >> 8;
+		ciphertext[4 * i + 1] = cdata[i] & 0xff;
+		cdata[i] = cdata[i] >> 8;
+		ciphertext[4 * i + 0] = cdata[i] & 0xff;
+	}
+
+	for (m = 0; m < BCRYPT_HASHLEN; m++) {
+		encrypted[m] = enif_make_uint(env, ciphertext[m]);
+	}
+	secure_bzero(state.data, state.size);
+	enif_release_binary(&state);
+	secure_bzero(ciphertext, sizeof(ciphertext));
+	secure_bzero(cdata, sizeof(cdata));
+	return enif_make_list_from_array(env, encrypted, BCRYPT_HASHLEN);
+}
+
+/*
+ * A typical memset() or bzero() call can be optimized away due to "dead store
+ * elimination" by sufficiently intelligent compilers.  This is a problem for
+ * the above bf_encrypt() function which tries to zero-out several temporary
+ * buffers before returning.  If these calls get optimized away, then these
+ * buffers might leave sensitive information behind.  There are currently no
+ * standard, portable functions to handle this issue -- thus the
+ * implementation below.
+ *
+ * This function cannot be optimized away by dead store elimination, but it
+ * will be slower than a normal memset() or bzero() call.  Given that the
+ * bcrypt algorithm is designed to consume a large amount of time, the change
+ * will likely be negligible.
+ */
+static void
+secure_bzero(void *buf, size_t len)
+{
+	if (buf == NULL || len == 0) {
+		return;
+	}
+
+	volatile unsigned char *ptr = buf;
+	while (len--) {
+		*ptr++ = 0;
+	}
 }
 
 static ErlNifFunc bcrypt_nif_funcs[] =
 {
-    {"encode_salt", 2, erl_encode_salt},
-    {"hashpw", 2, hashpw}
+	{"bf_init", 3, bf_init},
+	{"bf_expand", 4, bf_expand},
+	{"bf_encrypt", 1, bf_encrypt}
 };
 
 ERL_NIF_INIT(bcrypt, bcrypt_nif_funcs, NULL, NULL, NULL, NULL)
