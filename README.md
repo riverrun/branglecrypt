@@ -1,14 +1,15 @@
-##branglecrypt
+## branglecrypt
 
-Erlang wrapper for OpenBSD bcrypt.
+Erlang bcrypt hashing library.
 
-This application is based on [erlang-bcrypt](https://github.com/opscode/erlang-bcrypt),
-but it is a lot more lightweight, and it uses an updated version of the
-OpenBSD Bcrypt hashing scheme.
+Branglecrypt uses NIFs (Native Implemented Functions) to call the most expensive
+operations. It has recently been updated to stop the NIFs from running too
+long, which can cause the Erlang VM scheduler problems, making it more
+robust as a result.
 
 So far, `branglecrypt` has only been tested on Linux.
 
-###Usage
+### Usage
 
 There are functions to generate a salt `bcrypt:gen_salt`
 and then use that salt to hash a password `bcrypt:hashpw`, but there are
@@ -26,3 +27,6 @@ also the following three convenience functions (with examples):
 
     bcrypt:dummy_checkpw("difficult2guess").
 
+### License
+
+BSD. For more details, view the `LICENSE` file.
