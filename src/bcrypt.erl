@@ -56,7 +56,6 @@ bf_encrypt(_State) ->
 %%      The log_rounds parameter determines the computational complexity
 %%      of the hashing. Its default is 12, the minimum is 4, and the maximum
 %%      is 31.
-%%      The minimum and maximum values are checked by the C code.
 gen_salt() ->
     gen_salt(?LOGR).
 
@@ -81,7 +80,8 @@ random_bytes(_N) ->
 hashpw(Password, Salt) ->
     {Salt1, _} = lists:split(29, Salt),
     [Prefix, LogRounds, Salt2] = string:tokens(Salt1, "$"),
-    Hash = bcrypt(Password, Salt2, Prefix, LogRounds),
+    Key = binary:bin_to_list(unicode:characters_to_binary(Password)),
+    Hash = bcrypt(Key, Salt2, Prefix, LogRounds),
     fmt_hash(Hash, Salt2, Prefix, LogRounds).
 
 bcrypt(Key, Salt, Prefix, LogRounds) ->
@@ -140,7 +140,7 @@ dummy_checkpw() ->
 
 %% @spec secure_check(Hash::string() | string(), Stored::string() | string()) -> boolean()
 secure_check(<<Hash/binary>>, <<Stored/binary>>) ->
-    secure_check(binary_to_list(Hash), binary_to_list(Stored));
+    secure_check(binary:bin_to_list(Hash), binary:bin_to_list(Stored));
 secure_check(Hash, Stored) when is_list(Hash) and is_list(Stored) ->
     case length(Hash) == length(Stored) of
         true -> secure_check(Hash, Stored, 0);
