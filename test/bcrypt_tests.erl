@@ -15,11 +15,15 @@ pairs(Pairs) ->
     [?_assert(Hash =:= bcrypt:hashpw(Pass, Salt)) ||
      {Pass, Salt, Hash} <- Pairs].
 
+hash_check(Pass, Wrong1, Wrong2, Wrong3) ->
+    H = bcrypt:hashpwsalt(Pass),
+    [?_assert(bcrypt:checkpw(Pass, H) =:= true),
+    ?_assert(bcrypt:checkpw(Wrong1, H) =:= false),
+    ?_assert(bcrypt:checkpw(Wrong2, H) =:= false),
+    ?_assert(bcrypt:checkpw(Wrong3, H) =:= false)].
+
 hash_check_test_() ->
-    H = bcrypt:hashpwsalt("hardtoguess"),
-    [?_assert(bcrypt:checkpw("hardtoguess", H) =:= true),
-    ?_assert(bcrypt:checkpw("hatdoguess", H) =:= false),
-    ?_assert(bcrypt:checkpw("ohsodifficult", H) =:= false)].
+    hash_check("hard2guess", "hardguess", "hard 2guess", "had2guess").
 
 dummy_check_test_() ->
     ?_assert(bcrypt:dummy_checkpw() =:= false).
@@ -40,5 +44,4 @@ salt_wrong_input_test_() ->
     ?_assert(lists:prefix("$2b$12$", bcrypt:gen_salt(["wrong type"])) =:= true)].
 
 hash_wrong_input_test_() ->
-    [?_assertError(badarg, bcrypt:hashpw("U*U", "$2a$05$CCCCCCCCCCCCCCCCCCC.")),
-    ?_assertError(badarg, bcrypt:hashpw(["U*U"], "$2a$05$CCCCCCCCCCCCCCCCCCCCC."))].
+    [?_assertError(badarg, bcrypt:hashpw("U*U", "$2a$05$CCCCCCCCCCCCCCCCCCC."))].

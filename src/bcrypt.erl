@@ -80,8 +80,7 @@ random_bytes(_N) ->
 hashpw(Password, Salt) ->
     {Salt1, _} = lists:split(29, Salt),
     [Prefix, LogRounds, Salt2] = string:tokens(Salt1, "$"),
-    Key = binary:bin_to_list(unicode:characters_to_binary(Password)),
-    Hash = bcrypt(Key, Salt2, Prefix, LogRounds),
+    Hash = bcrypt(Password, Salt2, Prefix, LogRounds),
     fmt_hash(Hash, Salt2, Prefix, LogRounds).
 
 bcrypt(Key, Salt, Prefix, LogRounds) ->
