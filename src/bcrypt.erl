@@ -15,10 +15,8 @@
 -define(LOGR, 12).
 
 start() ->
-    application:start(tools),
     application:start(bcrypt).
 stop() ->
-    application:stop(tools),
     application:stop(bcrypt).
 
 %% @spec init() -> ok
@@ -80,8 +78,15 @@ random_bytes(_N) ->
 hashpw(Password, Salt) ->
     {Salt1, _} = lists:split(29, Salt),
     [Prefix, LogRounds, Salt2] = string:tokens(Salt1, "$"),
-    Hash = bcrypt(Password, Salt2, Prefix, LogRounds),
+    Hash = bcrypt(filter_chars(Password, []), Salt2, Prefix, LogRounds),
     fmt_hash(Hash, Salt2, Prefix, LogRounds).
+
+filter_chars([], Acc) -> Acc;
+filter_chars([H|T], Acc) when H > 255 ->
+    Chars = binary:bin_to_list(unicode:characters_to_binary([H])),
+    filter_chars(T, lists:append(Acc, Chars));
+filter_chars([H|T], Acc) ->
+    filter_chars(T, lists:append(Acc, [H])).
 
 bcrypt(Key, Salt, Prefix, LogRounds) ->
     Key_len = case Prefix of
@@ -93,26 +98,26 @@ bcrypt(Key, Salt, Prefix, LogRounds) ->
     bf_encrypt(expand_keys(State, Key, Key_len, Salt1, Rounds)).
 
 prepare_keys(Salt, {LogRounds, _}) when LogRounds > 4 andalso LogRounds < 32 ->
-    {tools:decode64(Salt), 1 bsl LogRounds};
+    {bbase64:decode(Salt), 1 bsl LogRounds};
 prepare_keys(_, _) ->
     erlang:error({badarg}).
 
 expand_keys(State, _Key, _Key_len, _Salt, 0) ->
     State;
 expand_keys(State, Key, Key_len, Salt, Rounds) ->
-    NewState = bf_expand(State, Key, Key_len, Salt),
-    expand_keys(NewState, Key, Key_len, Salt, Rounds - 1).
+    expand_keys(bf_expand(State, Key, Key_len, Salt),
+                Key, Key_len, Salt, Rounds - 1).
 
 zero_str(LogRounds) ->
-    if LogRounds < 10 -> [48| integer_to_list(LogRounds)];
-       true -> integer_to_list(LogRounds)
+    if LogRounds < 10 -> lists:concat(["0", LogRounds]);
+       true -> LogRounds
     end.
 
 fmt_salt(Salt, LogRounds) ->
-    lists:concat(["$2b$", LogRounds, "$", tools:encode64(Salt)]).
+    lists:concat(["$2b$", LogRounds, "$", bbase64:encode(Salt)]).
 
 fmt_hash(Hash, Salt, Prefix, LogRounds) ->
-    lists:concat(["$", Prefix, "$", LogRounds, "$", Salt, tools:encode64(Hash)]).
+    lists:concat(["$", Prefix, "$", LogRounds, "$", Salt, bbase64:encode(Hash)]).
 
 %% @spec hashpwsalt(Password::string()) -> string()
 %% @doc Convenience function that randomly generates a salt,

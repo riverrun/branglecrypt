@@ -11,6 +11,9 @@ b_prefix_test_() ->
 long_pass_test_() ->
     pairs(?PAIRS_3).
 
+consistency_test_() ->
+    pairs(?PAIRS_4).
+
 pairs(Pairs) ->
     [?_assert(Hash =:= bcrypt:hashpw(Pass, Salt)) ||
      {Pass, Salt, Hash} <- Pairs].
@@ -23,7 +26,17 @@ hash_check(Pass, Wrong1, Wrong2, Wrong3) ->
     ?_assert(bcrypt:checkpw(Wrong3, H) =:= false)].
 
 hash_check_test_() ->
+    hash_check("password", "passwor", "passwords", "pasword"),
     hash_check("hard2guess", "hardguess", "hard 2guess", "had2guess").
+
+hash_check_extended_test_() ->
+    hash_check("aáåäeéêëoôö", "aáåäeéêëoö", "aáåeéêëoôö", "aáå äeéêëoôö"),
+    hash_check("aáåä eéêëoôö", "aáåä eéê ëoö", "a áåeé êëoôö", "aáå äeéêëoôö").
+
+hash_check_nonascii_test_() ->
+    hash_check("Сколько лет, сколько зим", "Сколько лет,сколько зим",
+    "Сколько лет сколько зим", "Сколько лет, сколько"),
+    hash_check("สวัสดีครับ", "สวัดีครับ", "สวัสสดีครับ", "วัสดีครับ").
 
 dummy_check_test_() ->
     ?_assert(bcrypt:dummy_checkpw() =:= false).
