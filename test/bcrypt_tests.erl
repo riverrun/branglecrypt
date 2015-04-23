@@ -38,6 +38,9 @@ hash_check_nonascii_test_() ->
     "Сколько лет сколько зим", "Сколько лет, сколько"),
     hash_check("สวัสดีครับ", "สวัดีครับ", "สวัสสดีครับ", "วัสดีครับ").
 
+hash_check_mixedchars_test_() ->
+    hash_check("Я❤três☕ où☔", "Я❤tres☕ où☔", "Я❤três☕où☔", "Я❤três où☔").
+
 dummy_check_test_() ->
     ?_assert(bcrypt:dummy_checkpw() =:= false).
 

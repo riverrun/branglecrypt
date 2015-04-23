@@ -142,9 +142,7 @@ dummy_checkpw() ->
     hashpwsalt("password"),
     false.
 
-%% @spec secure_check(Hash::string() | string(), Stored::string() | string()) -> boolean()
-secure_check(<<Hash/binary>>, <<Stored/binary>>) ->
-    secure_check(binary:bin_to_list(Hash), binary:bin_to_list(Stored));
+%% @spec secure_check(Hash::string(), Stored::string()) -> boolean()
 secure_check(Hash, Stored) when is_list(Hash) and is_list(Stored) ->
     case length(Hash) == length(Stored) of
         true -> secure_check(Hash, Stored, 0);
