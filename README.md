@@ -1,13 +1,6 @@
 ## branglecrypt
 
-Erlang bcrypt hashing library.
-
-Branglecrypt uses NIFs (Native Implemented Functions) to call the most expensive
-operations. It has recently been updated to stop the NIFs from running too
-long, which can cause the Erlang VM scheduler problems, making it more
-robust as a result.
-
-So far, `branglecrypt` has only been tested on Linux.
+Erlang / C bcrypt hashing library.
 
 ### Usage
 
@@ -25,7 +18,7 @@ also the following three convenience functions (with examples):
 
 * dummy_checkpw -- run a dummy check that always returns false
 
-    bcrypt:dummy_checkpw("difficult2guess").
+    bcrypt:dummy_checkpw().
 
 ### License
 
