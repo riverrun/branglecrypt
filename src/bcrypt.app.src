@@ -1,8 +1,8 @@
 {application, bcrypt,
  [
   {description, "Bcrypt Erlang/C library"},
-  {vsn, "0.2.2"},
-  {modules, [bcrypt,bbase64]},
+  {vsn, "0.3.0"},
+  {modules, [bcrypt,bbase64,password]},
   {registered, []},
   {applications, [kernel,stdlib,crypto]},
   {env, []}

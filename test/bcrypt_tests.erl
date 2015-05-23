@@ -60,4 +60,4 @@ salt_wrong_input_test_() ->
     ?_assert(lists:prefix("$2b$12$", bcrypt:gen_salt(["wrong type"])) =:= true)].
 
 hash_wrong_input_test_() ->
-    [?_assertError(badarg, bcrypt:hashpw("U*U", "$2a$05$CCCCCCCCCCCCCCCCCCC."))].
+    ?_assertError(badarg, bcrypt:hashpw("U*U", "$2a$05$CCCCCCCCCCCCCCCCCCC.")).
