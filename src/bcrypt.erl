@@ -1,9 +1,8 @@
 %%% @doc Erlang NIF implementation of OpenBSD Bcrypt hashing scheme.
 %%%      Bcrypt is a key derivation function for passwords designed by Niels Provos
-%%%      and David Mazières. Bcrypt uses a salt to protect against offline attacks.
-%%%      It is also an adaptive function, which means that it can be configured
-%%%      to remain slow and resistant to brute-force attacks even as computational
-%%%      power increases.
+%%%      and David Mazières. Bcrypt is an adaptive hashing function, which means that
+%%%      it can be configured to remain slow and resistant to brute-force attacks
+%%%      even as computational power increases.
 %%%      This bcrypt implementation is based on the latest OpenBSD version, which
 %%%      fixed a small issue that affected some passwords longer than 72 characters.
 
@@ -19,7 +18,6 @@ start() ->
 stop() ->
     application:stop(bcrypt).
 
-%% @spec init() -> ok
 %% @doc Initialize bcrypt NIF (the functions encode_salt and hashpw).
 init() ->
     SoName = filename:join(case code:priv_dir(?MODULE) of
@@ -32,24 +30,20 @@ init() ->
                            end, atom_to_list(?MODULE) ++ "_nif"),
     erlang:load_nif(SoName, 0).
 
-%% @spec bf_init(Key::string(), Key_len::integer(), Salt::string()) -> string()
 %% @doc Initialize the P-box and S-box tables with the digits of Pi,
 %%      and then start the key expansion process.
 bf_init(_Key, _Key_len, _Salt) ->
     erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
 
-%% @spec bf_init(State::binary(), Key::string(), Key_len::integer(), Salt::string()) -> binary()
 %% @doc The main key expansion function. This function is called
 %%      2^log_rounds times.
 bf_expand(_State, _Key, _Key_len, _Salt) ->
     erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
 
-%% @spec bf_init(Key::string(), Key_len::integer(), Salt::string()) -> string()
 %% @doc Encrypt and return the hash.
 bf_encrypt(_State) ->
     erlang:nif_error({nif_not_loaded, module, ?MODULE, line, ?LINE}).
 
-%% @spec gen_salt(integer()) -> string()
 %% @doc Generate a salt for use with the hashpw function.
 %%      The log_rounds parameter determines the computational complexity
 %%      of the hashing. Its default is 12, the minimum is 4, and the maximum
@@ -73,7 +67,6 @@ random_bytes(N) when is_integer(N) ->
 random_bytes(_N) ->
     erlang:error({badarg}).
 
-%% @spec hashpw(Password::string(), Salt::string()) -> string()
 %% @doc Hash the password using bcrypt.
 hashpw(Password, Salt) ->
     {Salt1, _} = lists:split(29, Salt),
@@ -119,13 +112,11 @@ fmt_salt(Salt, LogRounds) ->
 fmt_hash(Hash, Salt, Prefix, LogRounds) ->
     lists:concat(["$", Prefix, "$", LogRounds, "$", Salt, bbase64:encode(Hash)]).
 
-%% @spec hashpwsalt(Password::string()) -> string()
 %% @doc Convenience function that randomly generates a salt,
 %%      and then hashes the password with that salt.
 hashpwsalt(Password) ->
     hashpw(Password, gen_salt(?LOGR)).
 
-%% @spec checkpw(Password::string(), Hash::string()) -> boolean()
 %% @doc Check the password against the stored hash.
 %%      The password and stored hash are compared in constant time
 %%      to avoid timing attacks.
@@ -133,7 +124,6 @@ checkpw(Plaintext, Stored_hash) ->
     Hash = hashpw(Plaintext, Stored_hash),
     secure_check(Hash, Stored_hash).
 
-%% @spec dummy_checkpw() -> boolean()
 %% @doc Perform a dummy check for a user that does not exist.
 %%      This always returns false.
 %%      The reason for implementing this check is in order to make
@@ -142,7 +132,6 @@ dummy_checkpw() ->
     hashpwsalt("password"),
     false.
 
-%% @spec secure_check(Hash::string(), Stored::string()) -> boolean()
 secure_check(Hash, Stored) when is_list(Hash) and is_list(Stored) ->
     case length(Hash) == length(Stored) of
         true -> secure_check(Hash, Stored, 0);
@@ -150,7 +139,6 @@ secure_check(Hash, Stored) when is_list(Hash) and is_list(Stored) ->
     end;
 secure_check(_Hash, _Stored) -> false.
 
-%% @spec secure_check(H::string(), S::string(), Result::integer()) -> boolean()
 secure_check([H|RestH], [S|RestS], Result) ->
     secure_check(RestH, RestS, (H bxor S) bor Result);
 secure_check([], [], Result) ->
