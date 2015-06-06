@@ -1,5 +1,5 @@
 -module(password).
--export([gen_password/0, gen_password/1, valid_password/1]).
+-export([gen_password/0, gen_password/1, strong_password/1]).
 
 -define(ALPHA, lists:seq($A, $Z) ++ lists:seq($a, $z)).
 -define(DIGITS, "0123456789").
@@ -34,7 +34,7 @@ get_char(Val) ->
     element(Val, ?CHAR_MAP).
 
 %% @doc Function that checks password strength.
-valid_password(Password) ->
+strong_password(Password) ->
     case pass_length(length(Password), ?MIN_PASS_LEN) of
         true -> extra_chars(Password);
         Message -> Message
