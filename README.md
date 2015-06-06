@@ -27,14 +27,14 @@ also the following three convenience functions (with examples):
 
     bcrypt:dummy_checkpw().
 
-### Generating and validating passwords
+### Generating passwords and checking password strength
 
 * gen_password -- generate a random password (the default length is 12 characters)
 
     Password = password:gen_password().
     Password = password:gen_password(16).
 
-* valid_password -- checks that a password is long enough and contains at least
+* strong_password -- checks that a password is long enough and contains at least
 one digit and one punctuation character.
 
     password:valid_password(Password).
