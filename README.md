@@ -6,7 +6,7 @@ Erlang / C bcrypt hashing library.
 
 * Branglecrypt is secure and easy to use.
 * None of the NIFs run for a long time.
-* There are also functions for generating random passwords and validating
+* There are also functions for generating random passwords and checking
 passwords for password strength.
 
 ## Usage
@@ -37,7 +37,7 @@ also the following three convenience functions (with examples):
 * strong_password -- checks that a password is long enough and contains at least
 one digit and one punctuation character.
 
-    password:valid_password(Password).
+    password:strong_password(Password).
 
 ## License
 
