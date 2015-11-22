@@ -52,20 +52,9 @@ gen_salt() ->
     gen_salt(?LOGR).
 
 gen_salt(LogRounds) when is_integer(LogRounds), LogRounds > 4, LogRounds < 32 ->
-    fmt_salt(binary:bin_to_list(random_bytes(16)), zero_str(LogRounds));
+    fmt_salt(binary:bin_to_list(crypto:strong_rand_bytes(16)), zero_str(LogRounds));
 gen_salt(_LogR) ->
     gen_salt(?LOGR).
-
-random_bytes(N) when is_integer(N) ->
-    try crypto:strong_rand_bytes(N) of
-        RandBytes ->
-            RandBytes
-    catch
-        error:low_entropy ->
-            crypto:rand_bytes(N)
-    end;
-random_bytes(_N) ->
-    erlang:error({badarg}).
 
 %% @doc Hash the password using bcrypt.
 hashpw(Password, Salt) ->
