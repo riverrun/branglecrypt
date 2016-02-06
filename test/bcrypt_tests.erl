@@ -11,8 +11,11 @@ b_prefix_test_() ->
 long_pass_test_() ->
     pairs(?PAIRS_3).
 
-consistency_test_() ->
+long_pass_oldprefix_test_() ->
     pairs(?PAIRS_4).
+
+consistency_test_() ->
+    pairs(?PAIRS_5).
 
 pairs(Pairs) ->
     [?_assert(Hash =:= bcrypt:hashpw(Pass, Salt)) ||
